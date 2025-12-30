@@ -1,9 +1,30 @@
 <template>
-    <button class="equalizer" @mouseenter="startAnimation">
+    <button 
+        v-wave
+        class="equalizer" 
+        :class="{ 'eq-disabled': !eq.enabled }"
+        @mouseenter="handleMouseEnter" 
+        @mouseleave="handleMouseLeave"
+        @click="handleClick"
+        @wheel="handleIconWheel"
+    >
         <div class="icon">
-            <EqualizerSvg />
+            <Motion
+                :initial="{
+                    opacity: 0,
+                }"
+                :animate="{
+                    opacity: 1,
+                    transition: {
+                        delay: 0.25,
+                        duration: 0.5,
+                    },
+                }"
+            >
+                <EqualizerSvg :key="eq.enabled" />
+            </Motion>
         </div>
-        <div class="eq-popup">
+        <div class="eq-popup" @click.stop>
             <div class="eq-controls">
                 <button class="eq-toggle" :class="{ active: eq.enabled }" @click="eq.toggleEnabled">
                     {{ eq.enabled ? 'ON' : 'OFF' }}
@@ -48,6 +69,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Motion } from 'motion/vue'
 import EqualizerSvg from '@/assets/icons/equalizer.svg'
 import useEqualizer from '@/stores/equalizer'
 import { EQ_FREQUENCIES } from '@/utils/equalizer/eqPresets'
@@ -58,6 +80,8 @@ const frequencies = EQ_FREQUENCIES
 const animatedBands = ref<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
 const isAnimating = ref(false)
 const displayBands = ref<number[]>([...eq.bands])
+const isHovered = ref(false)
+const justClicked = ref(false)
 
 // Load saved settings on mount
 onMounted(() => {
@@ -65,6 +89,44 @@ onMounted(() => {
     selectedPreset.value = eq.currentPreset
     displayBands.value = [...eq.bands]
 })
+
+const handleMouseEnter = () => {
+    if (!isHovered.value && !justClicked.value) {
+        startAnimation()
+    }
+    isHovered.value = true
+    justClicked.value = false
+}
+
+const handleMouseLeave = () => {
+    isHovered.value = false
+}
+
+const handleClick = () => {
+    justClicked.value = true
+    eq.toggleEnabled()
+}
+
+const handleIconWheel = (event: WheelEvent) => {
+    event.preventDefault()
+    
+    const currentIndex = eq.availablePresets.findIndex(p => p === selectedPreset.value)
+    let newIndex: number
+    
+    if (event.deltaY < 0) {
+        // Scroll up - previous preset (with wrap-around)
+        newIndex = currentIndex - 1
+        if (newIndex < 0) newIndex = eq.availablePresets.length - 1
+    } else {
+        // Scroll down - next preset (with wrap-around)
+        newIndex = currentIndex + 1
+        if (newIndex >= eq.availablePresets.length) newIndex = 0
+    }
+    
+    selectedPreset.value = eq.availablePresets[newIndex]
+    eq.loadPreset(selectedPreset.value)
+    startAnimation()
+}
 
 const changeBandGain = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement
@@ -145,17 +207,50 @@ const formatFreq = (freq: number): string => {
         width: 100%;
         display: grid;
         place-items: center;
+        transition: opacity 0.3s ease;
         
         svg {
             transform: scale(0.75);
-            transition: opacity 0.2s;
+            transition: opacity 0.2s, color 0.3s ease;
         }
     }
 
     &:hover .icon svg {
         opacity: 0.7;
     }
+&.eq-disabled .icon {
+        opacity: 0.5;
+        
+        svg {
+            color: rgba(255, 255, 255, 0.65);
+        }
+    }
 
+    &.eq-disabled .eq-popup {
+        .eq-sliders {
+            opacity: 0.5;
+            
+            .eq-slider-wrap {
+                .gain-value {
+                    color: rgba(255, 255, 255, 0.3);
+                }
+                
+                .eq-slider {
+                    opacity: 0.6;
+                }
+                
+                .freq-label {
+                    color: rgba(255, 255, 255, 0.25);
+                }
+            }
+            
+            .db-scale .db-label {
+                color: rgba(255, 255, 255, 0.2);
+            }
+        }
+    }
+
+    
     .eq-popup {
         position: absolute;
         bottom: calc(100% + 20px);
@@ -246,6 +341,7 @@ const formatFreq = (freq: number): string => {
             display: flex;
             gap: 15px;
             align-items: flex-end;
+            transition: opacity 0.3s ease;
 
             .db-scale {
                 display: flex;
@@ -262,6 +358,7 @@ const formatFreq = (freq: number): string => {
                     color: rgba(255, 255, 255, 0.4);
                     font-family: 'Courier New', monospace;
                     line-height: 1;
+                    transition: color 0.3s ease;
                 }
             }
 
@@ -276,6 +373,7 @@ const formatFreq = (freq: number): string => {
                     font-weight: 600;
                     color: rgba(255, 255, 255, 0.6);
                     min-width: 32px;
+                    transition: color 0.3s ease;
                     text-align: center;
                     font-family: 'Courier New', monospace;
                 }
@@ -291,7 +389,7 @@ const formatFreq = (freq: number): string => {
                     outline: none;
                     cursor: pointer;
                     position: relative;
-                    transition: none;
+                    transition: opacity 0.3s ease;
 
                     &:hover {
                         background: rgba(255, 255, 255, 0.15);
@@ -346,6 +444,7 @@ const formatFreq = (freq: number): string => {
                     color: rgba(255, 255, 255, 0.5);
                     text-transform: uppercase;
                     letter-spacing: 0.3px;
+                    transition: color 0.3s ease;
                 }
             }
         }
