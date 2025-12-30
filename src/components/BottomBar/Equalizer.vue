@@ -1,12 +1,12 @@
 <template>
     <button 
+        v-wave
         class="equalizer" 
         :class="{ 'eq-disabled': !eq.enabled }"
         @mouseenter="handleMouseEnter" 
         @mouseleave="handleMouseLeave"
     >
         <div 
-            v-wave
             class="icon"
             @click.stop="handleClick"
             @wheel="handleIconWheel"
@@ -26,16 +26,34 @@
                 <EqualizerSvg :key="eq.enabled" />
             </Motion>
         </div>
-        <div class="eq-popup" @click.stop>
+        <div class="eq-popup" :class="{ pinned: isPinned }" @click.stop>
             <div class="eq-controls">
                 <button class="eq-toggle" :class="{ active: eq.enabled }" @click="eq.toggleEnabled">
                     {{ eq.enabled ? 'ON' : 'OFF' }}
                 </button>
-                <select v-model="selectedPreset" @change="onPresetChange" class="eq-preset">
-                    <option v-for="preset in eq.availablePresets" :key="preset" :value="preset">
-                        {{ preset }}
-                    </option>
-                </select>
+                <div class="eq-preset-selector" @mouseenter="showPresetDropdown = true" @mouseleave="showPresetDropdown = false">
+                    <div class="preset-display">
+                        {{ selectedPreset }}
+                    </div>
+                    <transition name="fade">
+                        <div v-if="showPresetDropdown" class="preset-dropdown">
+                            <div
+                                v-for="preset in eq.availablePresets"
+                                :key="preset"
+                                class="preset-item"
+                                :class="{ active: preset === selectedPreset }"
+                                @click="selectPreset(preset)"
+                            >
+                                {{ preset }}
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+                <button class="eq-pin-button" :class="{ pinned: isPinned }" @click="togglePin" title="Pin equalizer">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M9.5 2.5L13.5 6.5L9 11L11 13L10.5 13.5L7.5 10.5L2 16L1 15L6.5 9.5L3.5 6.5L4 6L6 8L10.5 3.5L9.5 2.5Z" fill="currentColor"/>
+                    </svg>
+                </button>
             </div>
             <div class="eq-sliders">
                 <div class="db-scale">
@@ -84,6 +102,8 @@ const isAnimating = ref(false)
 const displayBands = ref<number[]>([...eq.bands])
 const isHovered = ref(false)
 const justClicked = ref(false)
+const showPresetDropdown = ref(false)
+const isPinned = ref(false)
 
 // Load saved settings on mount
 onMounted(() => {
@@ -93,7 +113,7 @@ onMounted(() => {
 })
 
 const handleMouseEnter = () => {
-    if (!isHovered.value && !justClicked.value) {
+    if (!isHovered.value && !justClicked.value && !isPinned.value) {
         startAnimation()
     }
     isHovered.value = true
@@ -102,6 +122,7 @@ const handleMouseEnter = () => {
 
 const handleMouseLeave = () => {
     isHovered.value = false
+    if (isPinned.value) return
 }
 
 const handleClick = () => {
@@ -135,11 +156,23 @@ const changeBandGain = (index: number, event: Event) => {
     const value = parseFloat(target.value)
     eq.setBandGain(index, value)
     displayBands.value[index] = value
+    selectedPreset.value = 'Custom'
 }
 
 const onPresetChange = () => {
     eq.loadPreset(selectedPreset.value)
     startAnimation()
+}
+
+const selectPreset = (preset: string) => {
+    selectedPreset.value = preset
+    eq.loadPreset(preset)
+    showPresetDropdown.value = false
+    startAnimation()
+}
+
+const togglePin = () => {
+    isPinned.value = !isPinned.value
 }
 
 const startAnimation = () => {
@@ -186,6 +219,7 @@ const handleBandWheel = (index: number, event: WheelEvent) => {
     
     eq.setBandGain(index, newGain)
     displayBands.value[index] = newGain
+    selectedPreset.value = 'Custom'
 }
 
 const formatFreq = (freq: number): string => {
@@ -274,69 +308,120 @@ const formatFreq = (freq: number): string => {
 
         .eq-controls {
             display: flex;
-            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 16px;
             padding-bottom: 16px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 
             .eq-toggle {
                 padding: 6px 16px;
-                background: $gray;
-                border: 1.5px solid rgba(255, 255, 255, 0.15);
-                border-radius: 00.5rem;
-                color: #af3131ff;
+                background: $gray !important;
+                border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+                border-radius: 0.5rem;
+                color: #af3131ff !important;
                 font-size: 11px;
                 font-weight: 700;
                 letter-spacing: 0.5px;
                 cursor: pointer;
                 transition: all 0.2s;
 
-                &:hover {
-                    color: #ffffff;
-                    border-color: $gray;
-                    background: $gray;
+                &.active {
+                    color: #000000 !important;
+                    background: #f5f5f5 !important;
+                    border-color: #f5f5f5 !important;
+                }
+            }
+
+            .eq-preset-selector {
+                position: relative;
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+
+                .preset-display {
+                    padding: 8px 12px;
+                    color: rgba(255, 255, 255, 0.95);
+                    font-size: 13px;
+                    font-weight: 600;
+                    text-align: center;
+                    transition: color 0.2s ease;
                 }
 
-                &.active {
-                    color : #ffffff;
-                    background: #f5f5f5;
-                    border-color: #f5f5f5;
-                    color: #000000;
+                &:hover .preset-display {
+                    color: rgba(255, 255, 255, 1);
+                }
 
-                    &:hover {
-                        background: #ffffff;
-                        border-color: #ffffff;
-                        color: #000000;
+                .preset-dropdown {
+                    position: absolute;
+                    top: calc(100% + 5px);
+                    left: 0;
+                    right: 0;
+                    background: $context;
+                    border-radius: 0.5rem;
+                    padding: $small;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                    z-index: 1001;
+                    max-height: 240px;
+                    overflow-y: auto;
+
+                    .preset-item {
+                        padding: 0.4rem 0.8rem;
+                        border-radius: $small;
+                        cursor: pointer;
+                        transition: background-color 0.2s ease;
+                        font-size: 12px;
+                        color: rgba(255, 255, 255, 0.9);
+
+                        &:hover {
+                            background: $darkestblue;
+                        }
+
+                        &.active {
+                            background: rgba(255, 255, 255, 0.1);
+                            color: rgba(255, 255, 255, 1);
+                        }
                     }
                 }
             }
 
-            .eq-preset {
-                flex: 1;
-                padding: 6px 16px;
-                background: $gray5;
-                border: 1.5px solid $gray3;
+            .eq-pin-button {
+                padding: 6px 8px;
+                background: $gray !important;
+                border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
                 border-radius: 0.5rem;
-                color: rgba(255, 255, 255, 0.9);
-                font-size: 11px;
-                font-weight: 500;
+                color: rgba(255, 255, 255, 0.5) !important;
                 cursor: pointer;
-                outline: none;
                 transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
 
-                &:hover {
-                    border-color: white;
-                    background: $gray5;
+                svg {
+                    width: 14px;
+                    height: 14px;
+                    transform: rotate(-45deg);
                 }
 
-                &:focus {
-                    background: $gray5;
-                    border-color: white;
-                }
-                option {                 
-                    background: $gray5;
+                &.pinned {
+                    color: #000000 !important;
+                    background: #f5f5f5 !important;
+                    border-color: #f5f5f5 !important;
                 }
             }
+        }
+
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.2s ease;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
         }
 
         .eq-sliders {
@@ -452,7 +537,8 @@ const formatFreq = (freq: number): string => {
         }
     }
 
-    &:hover .eq-popup {
+    &:hover .eq-popup,
+    .eq-popup.pinned {
         opacity: 1;
         visibility: visible;
         transform: translateX(-50%) translateY(0);
