@@ -1,14 +1,16 @@
 <template>
     <button 
-        v-wave
         class="equalizer" 
         :class="{ 'eq-disabled': !eq.enabled }"
         @mouseenter="handleMouseEnter" 
         @mouseleave="handleMouseLeave"
-        @click="handleClick"
-        @wheel="handleIconWheel"
     >
-        <div class="icon">
+        <div 
+            v-wave
+            class="icon"
+            @click.stop="handleClick"
+            @wheel="handleIconWheel"
+        >
             <Motion
                 :initial="{
                     opacity: 0,
@@ -177,7 +179,7 @@ const handleBandWheel = (index: number, event: WheelEvent) => {
     const currentGain = eq.bands[index]
     
     // Adjust by scroll (negative delta = scroll up = increase gain)
-    let newGain = currentGain - delta * 8
+    let newGain = currentGain - delta * 2
     
     // Clamp between -12 and +12
     newGain = Math.max(-12, Math.min(12, newGain))
