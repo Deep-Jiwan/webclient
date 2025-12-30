@@ -148,9 +148,34 @@ export const useEqualizer = defineStore('equalizer', {
                 localStorage.setItem('eq_enabled', JSON.stringify(this.enabled))
                 localStorage.setItem('eq_bands', JSON.stringify(this.bands))
                 localStorage.setItem('eq_preset', this.currentPreset)
+                
+                // If custom preset, save it
+                if (this.currentPreset === 'Custom') {
+                    localStorage.setItem('eq_custom_preset', JSON.stringify(this.bands))
+                }
             } catch (error) {
                 console.warn('Failed to save EQ settings to localStorage:', error)
             }
+        },
+        
+        /**
+         * Load custom preset from localStorage if it exists
+         */
+        loadCustomPreset() {
+            try {
+                const customPreset = localStorage.getItem('eq_custom_preset')
+                if (customPreset) {
+                    const gains = JSON.parse(customPreset)
+                    if (Array.isArray(gains) && gains.length === 8) {
+                        this.bands = gains
+                        this.currentPreset = 'Custom'
+                        return true
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load custom preset:', error)
+            }
+            return false
         },
     },
 })

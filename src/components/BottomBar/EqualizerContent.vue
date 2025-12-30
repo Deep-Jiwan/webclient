@@ -49,13 +49,15 @@ import { EQ_FREQUENCIES } from '@/utils/equalizer/eqPresets'
 const eq = useEqualizer()
 const selectedPreset = ref(eq.currentPreset)
 const frequencies = EQ_FREQUENCIES
-const animatedBands = ref<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
 const isAnimating = ref(false)
 const displayBands = ref<number[]>([...eq.bands])
+let animationFrameId: number | null = null
 
 // Load saved settings on mount
 onMounted(() => {
     eq.loadFromLocalStorage()
+    // Try to load custom preset if it exists
+    eq.loadCustomPreset()
     selectedPreset.value = eq.currentPreset
     displayBands.value = [...eq.bands]
 })
@@ -65,11 +67,19 @@ watch(() => eq.currentPreset, (newPreset) => {
     selectedPreset.value = newPreset
 })
 
+// Watch for band changes and sync displayBands
+watch(() => eq.bands, (newBands) => {
+    if (!isAnimating.value) {
+        displayBands.value = [...newBands]
+    }
+}, { deep: true })
+
 const changeBandGain = (index: number, event: Event) => {
     const target = event.target as HTMLInputElement
     const value = parseFloat(target.value)
     eq.setBandGain(index, value)
-    displayBands.value[index] = value
+    eq.currentPreset = 'Custom'
+    selectedPreset.value = 'Custom'
 }
 
 const onPresetChange = () => {
@@ -78,10 +88,12 @@ const onPresetChange = () => {
 }
 
 const startAnimation = () => {
-    if (isAnimating.value) return
+    // Cancel previous animation
+    if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+    }
     
     isAnimating.value = true
-    animatedBands.value = [0, 0, 0, 0, 0, 0, 0, 0]
     
     const startTime = performance.now()
     const duration = 1000
@@ -93,18 +105,18 @@ const startAnimation = () => {
         
         const easeProgress = 1 - Math.pow(1 - progress, 3)
         
-        animatedBands.value = targetBands.map(target => target * easeProgress)
-        displayBands.value = [...animatedBands.value]
+        displayBands.value = targetBands.map(target => target * easeProgress)
         
         if (progress < 1) {
-            requestAnimationFrame(animate)
+            animationFrameId = requestAnimationFrame(animate)
         } else {
             isAnimating.value = false
+            animationFrameId = null
             displayBands.value = [...eq.bands]
         }
     }
     
-    requestAnimationFrame(animate)
+    animationFrameId = requestAnimationFrame(animate)
 }
 
 const handleBandWheel = (index: number, event: WheelEvent) => {
@@ -116,7 +128,8 @@ const handleBandWheel = (index: number, event: WheelEvent) => {
     newGain = Math.max(-12, Math.min(12, newGain))
     
     eq.setBandGain(index, newGain)
-    displayBands.value[index] = newGain
+    eq.currentPreset = 'Custom'
+    selectedPreset.value = 'Custom'
 }
 
 const formatFreq = (freq: number): string => {
@@ -136,10 +149,7 @@ defineExpose({
 .eq-popup {
     background-color: $gray;
     padding: 25px 15px;
-    border-top: 1px solid $gray3;
-    border-bottom: 1px solid $gray3;
-    border-right: 1px solid $gray3;
-    border-left: 1px solid $gray3;
+    border: 1px solid $gray3;
     border-radius: 0.5rem;
     -webkit-font-smoothing: antialiased;
 
@@ -164,12 +174,11 @@ defineExpose({
 
             &:hover {
                 color: #ffffff;
-                border-color: $gray;
+                border-color: rgba(255, 255, 255, 0.3);
                 background: $gray;
             }
 
             &.active {
-                color : #ffffff;
                 background: #f5f5f5;
                 border-color: #f5f5f5;
                 color: #000000;
@@ -177,7 +186,6 @@ defineExpose({
                 &:hover {
                     background: #ffffff;
                     border-color: #ffffff;
-                    color: #000000;
                 }
             }
         }
