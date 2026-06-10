@@ -9,7 +9,7 @@ This project requires `Node v14` or newer and `yarn@1.22.19`. Install them first
 - [NodeJS](https://nodejs.org/en/)
 - [Yarn](https://yarnpkg.com)
 
-Clone the repository and install the dependencies.
+Clone the repository and install the dependencies for the app
 
 ```bash
 git clone https://github.com/geoffrey45/swing-client.git
